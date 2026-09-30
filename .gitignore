@@ -12,3 +12,7 @@ node_modules/
 dist/
 *.db
 *.pkl
+*.pdf
+MARIVANCE_Demo_Video_Script.*
+generate_script_pdf.py
+
