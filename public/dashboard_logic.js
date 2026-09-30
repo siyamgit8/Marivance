@@ -194,55 +194,77 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatSend = document.getElementById('chat-send');
     const chatMessages = document.getElementById('chat-messages');
 
-    function sendCopilotMessage() {
+    async function sendCopilotMessage() {
         const text = chatInput.value.trim();
         if(!text) return;
         
         chatMessages.innerHTML += `<div class="chat-bubble chat-user"><strong>🧑‍💼 Logistics Officer:</strong><br>${text}</div>`;
         chatInput.value = '';
-        
-        const t = text.toLowerCase();
-        let answer = null;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
 
-        // Expanded keyword matching across all COPILOT_KNOWLEDGE keys
-        for (let key in COPILOT_KNOWLEDGE) {
-            const k = key.toLowerCase();
-            // Check if any word from key appears in question or vice versa
-            const keyWords = k.split(/[\s,?\/]+/).filter(w => w.length > 3);
-            if (keyWords.some(w => t.includes(w))) {
-                answer = COPILOT_KNOWLEDGE[key];
-                break;
+        const currentOrigin = originSelect ? originSelect.value : "Hay Point (Australia)";
+        const currentDest = destSelect ? destSelect.value : "Paradip";
+        const currentVol = volSlider ? parseFloat(volSlider.value) : 75000;
+
+        // Show typing indicator
+        const loadingId = 'loading-' + Date.now();
+        chatMessages.innerHTML += `<div class="chat-bubble chat-copilot" id="${loadingId}"><em>🤖 Analyzing port constraints and route parameters...</em></div>`;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        try {
+            const res = await fetch('/api/copilot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customPrompt: text,
+                    origin: currentOrigin,
+                    destination: currentDest,
+                    cargoVolume: currentVol
+                })
+            });
+
+            const loadingEl = document.getElementById(loadingId);
+            if (res.ok) {
+                const data = await res.json();
+                if (loadingEl) {
+                    loadingEl.innerHTML = `<strong>🤖 MARIVANCE Copilot:</strong><br>${data.answer}`;
+                }
+            } else {
+                throw new Error("API call failed");
+            }
+        } catch (err) {
+            // Client-side fallback generator
+            const loadingEl = document.getElementById(loadingId);
+            const p = text.toLowerCase();
+            let fallbackAnswer = "";
+
+            if (p.includes("haldia") && (p.includes("australia") || p.includes("route") || p.includes("condition") || p.includes("hay point"))) {
+                fallbackAnswer = `<b>🚢 Route Analysis: Australia (Hay Point) ➔ Haldia</b><br><br>• <b>Voyage Distance:</b> 4,920 NM (~15.2 days steaming at 13.5 kts)<br>• <b>Port Depth & Draft Limit:</b> Max <b>8.5 meters</b> (Riverine tidal restriction on the Hooghly River).<br>• <b>Vessel Feasibility:</b> Capesize (17.5m) and Panamax (13.5m) are <b>strictly blocked</b>. Only <b>Handysize (~35,000 MT)</b> or lightered Supramax vessels can berth.<br>• <b>Operational Strategy:</b> Sourcing large coal parcels directly into Haldia causes high ocean freight penalties. Best practice is routing Capesize to Gangavaram and railing cargo inland.`;
+            } else if (p.includes("paradip") && (p.includes("australia") || p.includes("route") || p.includes("condition") || p.includes("hay point"))) {
+                fallbackAnswer = `<b>🚢 Route Analysis: Australia (Hay Point) ➔ Paradip</b><br><br>• <b>Voyage Distance:</b> 4,900 NM (~15.1 days steaming at 13.5 kts)<br>• <b>Port Depth & Draft Limit:</b> Max <b>16.5 meters</b> | Max LOA: 260m.<br>• <b>Vessel Feasibility:</b> Capesize (17.5m) is draft-restricted in inner berths. Optimal fleet is <b>2x Panamax (75,000 MT, 13.5m draft)</b> or Supramax.<br>• <b>Congestion & Demurrage:</b> Paradip experiences ~4.8 days average queue wait, risking ~$105,000 in excess demurrage per voyage.`;
+            } else if (p.includes("gangavaram")) {
+                fallbackAnswer = `<b>⚓ Port Intelligence: Gangavaram (Andhra Pradesh)</b><br><br>• <b>Max Permissible Draft:</b> <b>18.2 meters</b> (Ultra-deepwater all-weather private terminal).<br>• <b>Vessel Compatibility:</b> Fully accommodates laden Capesize (17.5m draft, 170,000 MT) with 15% volume discount.<br>• <b>Turnaround Advantage:</b> Average queue wait is only <b>1.1 days</b> (vs 4.8d at Paradip), eliminating demurrage and saving ~$78,000 per voyage.`;
+            } else if (p.includes("vizag") || p.includes("visakhapatnam")) {
+                fallbackAnswer = `<b>⚓ Port Intelligence: Visakhapatnam / Vizag (Andhra Pradesh)</b><br><br>• <b>Max Permissible Draft:</b> <b>14.5 meters</b> | Max LOA: 245m.<br>• <b>Vessel Compatibility:</b> Ideal for Panamax (13.5m) and Supramax (11.5m). Capesize (17.5m) is blocked.<br>• <b>Turnaround & Wait:</b> Average wait ~3.2 days; discharge rate ~22,000 MT/day.`;
+            } else if (p.includes("haldia")) {
+                fallbackAnswer = `<b>⚓ Port Intelligence: Haldia Dock Complex (West Bengal)</b><br><br>• <b>Max Permissible Draft:</b> <b>8.5 meters</b> (Severe estuarine & riverine tidal restriction).<br>• <b>Vessel Compatibility:</b> Restricted strictly to Handysize (~35,000 MT). Capesize and Panamax cannot enter without offshore lightering at Sandheads anchorage.`;
+            } else if (p.includes("paradip")) {
+                fallbackAnswer = `<b>⚓ Port Intelligence: Paradip Port (Odisha)</b><br><br>• <b>Max Permissible Draft:</b> <b>16.5 meters</b> | Max LOA: 260m.<br>• <b>Vessel Compatibility:</b> Accommodates Panamax (13.5m) and Supramax (11.5m). Capesize is restricted in inner berths.<br>• <b>Congestion Alert:</b> High coal congestion with ~4.8 days pre-berthing wait.`;
+            } else if (p.includes("panamax") || p.includes("capesize") || p.includes("vessel") || p.includes("fleet")) {
+                fallbackAnswer = `<b>🚢 Dry Bulk Fleet Classes & Optimization:</b><br><br>• <b>Capesize:</b> 170,000 MT | Draft 17.5m | 15% discount | Requires deepwater (Gangavaram/Dhamra).<br>• <b>Panamax:</b> 75,000 MT | Draft 13.5m | 10% discount | Ideal workhorse for Paradip & Vizag.<br>• <b>Supramax:</b> 55,000 MT | Draft 11.5m | 5% discount | Geared versatile vessel.<br>• <b>Handysize:</b> 35,000 MT | Draft 8.5m | 0% discount | Sole vessel class for Haldia river port.`;
+            } else if (p.includes("demurrage") || p.includes("laytime") || p.includes("idle")) {
+                fallbackAnswer = `<b>⏱️ Demurrage & Laytime Risk Analysis:</b><br><br>• <b>Daily Demurrage Rate:</b> ~$22,000 to $36,000/day assessed for delays beyond allowed laytime.<br>• <b>High Risk Terminals:</b> Paradip (4.8d wait) and Haldia (4.5d wait).<br>• <b>Mitigation:</b> Diverting shipments to Gangavaram (1.1d turnaround) eliminates ~$78,000 in laytime penalties per voyage.`;
+            } else if (p.includes("russia") || p.includes("taman") || p.includes("vostochny")) {
+                fallbackAnswer = `<b>🇷🇺 Russian Coking Coal Sourcing Strategy:</b><br><br>• <b>Vostochny:</b> ~4,500 NM (14d transit, 500 NM shorter than Australia).<br>• <b>Pricing Advantage:</b> Russian coking coal is traded at a 12–18% FOB discount, yielding ~$3.20/MT delivered savings for SAIL.`;
+            } else {
+                fallbackAnswer = `<b>🤖 MARIVANCE Maritime Logistics AI Advisor:</b><br><br>I can provide comprehensive intelligence on:<br>• <b>Route Conditions:</b> e.g. <em>"Haldia to Australia"</em> or <em>"Paradip to Australia"</em><br>• <b>Port Constraints:</b> Paradip (16.5m), Vizag (14.5m), Gangavaram (18.2m), Haldia (8.5m)<br>• <b>Vessel Allocation:</b> Capesize vs Panamax vs Supramax vs Handysize<br>• <b>Demurrage Reduction:</b> Gangavaram diversion economics`;
+            }
+
+            if (loadingEl) {
+                loadingEl.innerHTML = `<strong>🤖 MARIVANCE Copilot:</strong><br>${fallbackAnswer}`;
             }
         }
-
-        // Topic-based fallback matching
-        if (!answer) {
-            if (t.includes("demurrage") || t.includes("idle") || t.includes("laytime") || t.includes("waiting")) {
-                answer = COPILOT_KNOWLEDGE[Object.keys(COPILOT_KNOWLEDGE).find(k => k.toLowerCase().includes("demurrage"))] || null;
-            } else if (t.includes("haldia") || t.includes("river") || t.includes("riverine")) {
-                answer = COPILOT_KNOWLEDGE[Object.keys(COPILOT_KNOWLEDGE).find(k => k.toLowerCase().includes("haldia"))] || null;
-            } else if (t.includes("panamax") || t.includes("capesize") || t.includes("vessel") || t.includes("ship")) {
-                answer = COPILOT_KNOWLEDGE[Object.keys(COPILOT_KNOWLEDGE).find(k => k.toLowerCase().includes("panamax"))] || null;
-            } else if (t.includes("russia") || t.includes("taman") || t.includes("vostochny")) {
-                answer = COPILOT_KNOWLEDGE[Object.keys(COPILOT_KNOWLEDGE).find(k => k.toLowerCase().includes("russia"))] || null;
-            } else if (t.includes("paradip") || t.includes("vizag") || t.includes("port") || t.includes("draft") || t.includes("condition")) {
-                answer = COPILOT_KNOWLEDGE[Object.keys(COPILOT_KNOWLEDGE).find(k => k.toLowerCase().includes("port") || k.toLowerCase().includes("paradip"))] || null;
-            } else if (t.includes("freight") || t.includes("rate") || t.includes("cost") || t.includes("charter")) {
-                answer = COPILOT_KNOWLEDGE[Object.keys(COPILOT_KNOWLEDGE).find(k => k.toLowerCase().includes("freight") || k.toLowerCase().includes("rate"))] || null;
-            } else if (t.includes("australia") || t.includes("hay point") || t.includes("origin")) {
-                answer = COPILOT_KNOWLEDGE[Object.keys(COPILOT_KNOWLEDGE).find(k => k.toLowerCase().includes("australia") || k.toLowerCase().includes("origin"))] || null;
-            }
-        }
-
-        // Final fallback — generic summary
-        if (!answer) {
-            answer = "🚢 <b>SAIL Maritime Logistics DSS</b> covers:<br>• <b>Port draft constraints</b>: Haldia (8.5m), Paradip (16.5m), Vizag (14.5m), Gangavaram (18.2m)<br>• <b>Vessel classes</b>: Capesize (170k MT, 17.5m), Panamax (75k MT, 13.5m), Supramax (55k MT, 11.5m), Handysize (35k MT, 8.5m)<br>• <b>Russian coal routes</b>: Taman (Black Sea, 6200 NM) & Vostochny (Pacific, 5100 NM) with 12–18% FOB discount<br>• <b>Demurrage</b>: $22,000/day penalty for excess port stay<br><br>Try asking: <em>\"Why Panamax at Paradip?\"</em> or <em>\"Haldia constraints\"</em>";
-        }
-
-        setTimeout(() => {
-            chatMessages.innerHTML += `<div class="chat-bubble chat-copilot"><strong>🤖 MARIVANCE Copilot:</strong><br>${answer}</div>`;
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }, 500);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     chatSend.addEventListener('click', sendCopilotMessage);
     chatInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendCopilotMessage(); });

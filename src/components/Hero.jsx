@@ -20,6 +20,27 @@ export default function Hero() {
               Empowering India's national steel production with mathematical fleet optimization. Predicting freight rates, enforcing dual-terminal draft constraints, and delivering prescriptive MILP fleet allocations.
             </p>
 
+            <div style={{ marginBottom: '32px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <a href="/main_dashboard.html" className="btn btn-primary" style={{
+                borderRadius: '12px',
+                padding: '14px 32px',
+                fontSize: '1rem',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '10px',
+                color: '#fff',
+                background: 'linear-gradient(135deg, #00E5FF, #0072FF)',
+                boxShadow: '0 8px 30px rgba(0, 229, 255, 0.45)',
+                fontWeight: 700,
+                letterSpacing: '0.02em',
+                transition: 'all 0.25s ease'
+              }}>
+                <Zap size={18} />
+                <span>Open Dashboard</span>
+              </a>
+            </div>
+
 
             <div className="hero-hud-grid">
               <div className="hud-card">

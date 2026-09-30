@@ -69,152 +69,176 @@ const VESSEL_SPECS = {
   "Capesize": { capacity: 170000, draft: 17.5, loa: 290, discount: 0.15, dailyCharterRate: 36000 }
 };
 
-const COPILOT_KNOWLEDGE = {
-  "panamax_vs_cape": {
-    question: "Why did the system allocate 2x Panamax instead of a single Capesize?",
-    answer: "A Capesize bulk carrier requires a minimum water depth of 17.5 meters and Length Overall (LOA) of 290m. At draft-constrained discharge terminals such as Vizag (14.5m) or Paradip inner berths, a laden Capesize would violate Under-Keel Clearance (UKC) regulations. OceanIQ's PuLP MILP solver optimizes for 2x Panamax (75,000 MT, draft 13.5m), guaranteeing 100% navigational safety while capturing a 10% volume discount."
-  },
-  "haldia_constraints": {
-    question: "What are the riverine navigation constraints at Haldia port?",
-    answer: "Haldia Dock Complex (HDC) is located on the Hooghly River estuary with severe tidal drafts (~8.5m max permissible). It cannot accommodate Capesize or Panamax vessels without offshore lightering at Sandheads or diverting to deepwater terminals like Gangavaram or Dhamra followed by railway rakes to Durgapur and Bokaro steel plants."
-  },
-  "russian_coal": {
-    question: "How does Russian coal sourcing (Taman / Vostochny) compare to Australian origins?",
-    answer: "Vostochny (Russian Far East) ➔ Vizag is ~4,500 NM (~14 days transit), ~500 NM shorter than Hay Point, Australia. Taman (Black Sea) is longer (~5,700 NM) with higher canal fees. Sourcing from Vostochny provides SAIL a strong strategic hedge against Australian coking coal price spikes, yielding ~$3.20/MT delivered fuel parity savings."
-  },
-  "demurrage_mitigation": {
-    question: "What is our expected demurrage liability at this discharge port and how can we mitigate it?",
-    answer: "Paradip and Haldia experience significant queue waits of 4.5 to 4.8 days due to high thermal/coking coal congestion, accumulating ~$80,000–$105,000 in excess laytime penalties per voyage. Diverting to Gangavaram Port (1.1-day turnaround) eliminates demurrage, generating net savings of up to $78,000 per voyage."
-  }
-};
-
 // ═══════════════════════════════════════════════════════════════════════════════
-// API ROUTES
+// MARITIME LOGISTICS AI COPILOT INTELLIGENCE ENGINE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'online',
-    engine: 'MARIVANCE : AI-Powered Maritime Decision Intelligence Engine',
-    ml_pipeline: 'XGBoost v2.0 (R²=92.01%)',
-    optimizer: 'PuLP MILP Solver',
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.get('/api/ports', (req, res) => {
-  res.json({
-    origins: Object.keys(ROUTE_DISTANCES),
-    destinations: PORT_CONSTRAINTS,
-    vessels: VESSEL_SPECS
-  });
-});
-
-app.get('/api/telemetry', (req, res) => {
-  res.json({
-    bdi: { value: 1842, delta: '+1.4%', status: 'Normal' },
-    capesize_tc: { value: '$24,650/day', delta: '+2.1%' },
-    panamax_4tc: { value: '$14,820/day', delta: '-0.6%' },
-    bunker_vlsfo: { value: '$618.50/MT', delta: '+0.8%' },
-    congestion: {
-      paradip: '4.8 days (Heavy)',
-      vizag: '3.2 days (Moderate)',
-      gangavaram: '1.1 days (Fluid)',
-      haldia: '4.5 days (Tidal Restricted)'
+function generateCopilotAnswer(prompt, activeOrigin, activeDest, activeVolume) {
+  const p = (prompt || '').toLowerCase().trim();
+  
+  // 1. Detect Destination Port mentioned in prompt
+  let destMatch = null;
+  for (const dest of Object.keys(PORT_CONSTRAINTS)) {
+    const dLower = dest.toLowerCase();
+    if (p.includes(dLower) || (dest.includes('Vizag') && (p.includes('vizag') || p.includes('visakhapatnam')))) {
+      destMatch = dest;
+      break;
     }
-  });
-});
-
-app.post('/api/simulate', (req, res) => {
-  const { origin, destination, cargoVolume = 75000, contractType = 'Spot' } = req.body;
-  
-  const dist = (ROUTE_DISTANCES[origin] && ROUTE_DISTANCES[origin][destination]) 
-    ? ROUTE_DISTANCES[origin][destination] 
-    : 4900;
-  
-  const BASE_RATE_PER_NM = 0.0042;
-  const bdiFactor = 1.05;
-  let baseRate = (dist * BASE_RATE_PER_NM * 1.62) * bdiFactor;
-  
-  if (origin && origin.includes('Russia')) baseRate *= 1.08;
-  if (origin && origin.includes('USA')) baseRate *= 0.95;
-  if (contractType === 'COA') baseRate *= 0.94;
-  
-  const port = PORT_CONSTRAINTS[destination] || PORT_CONSTRAINTS['Paradip'];
-  let feasibleVessel = 'Handysize';
-  let vesselCount = 1;
-  let feasibilityStatus = 'optimal';
-  let feasibilityMessage = '';
-  
-  if (port.maxDraft >= 17.5 && cargoVolume >= 120000) {
-    feasibleVessel = 'Capesize';
-    vesselCount = Math.ceil(cargoVolume / VESSEL_SPECS['Capesize'].capacity);
-    feasibilityMessage = `Port accommodates Capesize draft (${port.maxDraft}m ≥ 17.5m). Lowest per-tonne freight.`;
-  } else if (port.maxDraft >= 13.5 && cargoVolume >= 60000) {
-    feasibleVessel = 'Panamax';
-    vesselCount = Math.ceil(cargoVolume / VESSEL_SPECS['Panamax'].capacity);
-    feasibilityMessage = `Port accommodates Panamax (${port.maxDraft}m ≥ 13.5m). Ideal fleet balance.`;
-  } else if (port.maxDraft >= 11.5) {
-    feasibleVessel = 'Supramax';
-    vesselCount = Math.ceil(cargoVolume / VESSEL_SPECS['Supramax'].capacity);
-    feasibilityMessage = `Capesize/Panamax draft restricted. Using geared Supramax.`;
-    feasibilityStatus = 'warning';
-  } else {
-    feasibleVessel = 'Handysize';
-    vesselCount = Math.ceil(cargoVolume / VESSEL_SPECS['Handysize'].capacity);
-    feasibilityMessage = `Strict shallow draft (${port.maxDraft}m). Restricted to Handysize / lightering.`;
-    feasibilityStatus = 'danger';
   }
-  
-  const discount = VESSEL_SPECS[feasibleVessel].discount;
-  const effectiveRate = baseRate * (1 - discount);
-  const totalOceanCost = effectiveRate * cargoVolume;
-  
-  const laytimeAllowedDays = Math.ceil(cargoVolume / 18000);
-  const actualPortStayDays = port.avgWait + Math.ceil(cargoVolume / port.ratePerDay);
-  const excessIdleDays = Math.max(0, actualPortStayDays - laytimeAllowedDays);
-  const dailyDemurrageRate = VESSEL_SPECS[feasibleVessel].dailyCharterRate;
-  const totalDemurrage = excessIdleDays * dailyDemurrageRate * vesselCount;
-  
-  const gvPortStay = 1.1 + Math.ceil(cargoVolume / 35000);
-  const gvExcess = Math.max(0, gvPortStay - laytimeAllowedDays);
-  const gvDemurrage = gvExcess * dailyDemurrageRate * vesselCount;
-  const diversionSavings = Math.max(0, totalDemurrage - gvDemurrage);
-  
-  res.json({
-    origin,
-    destination,
-    distanceNm: dist,
-    effectiveRateUsd: effectiveRate,
-    totalOceanCostUsd: totalOceanCost,
-    feasibleVessel,
-    vesselCount,
-    fleetSummary: `${vesselCount}x ${feasibleVessel}`,
-    feasibilityStatus,
-    feasibilityMessage,
-    portMaxDraft: port.maxDraft,
-    demurrageExposureUsd: totalDemurrage,
-    gangavaramDiversionSavingsUsd: diversionSavings,
-    contractType
-  });
-});
+
+  // 2. Detect Origin Port / Country mentioned in prompt
+  let originMatch = null;
+  for (const orig of Object.keys(ROUTE_DISTANCES)) {
+    const oLower = orig.toLowerCase();
+    const country = orig.split('(')[1]?.replace(')', '').toLowerCase() || '';
+    const nameOnly = orig.split('(')[0].trim().toLowerCase();
+    if (p.includes(oLower) || p.includes(nameOnly) || (country && p.includes(country))) {
+      originMatch = orig;
+      break;
+    }
+  }
+
+  // If specific route (Origin + Destination) mentioned in question
+  if (destMatch && (originMatch || p.includes('australia') || p.includes('russia') || p.includes('usa') || p.includes('indonesia') || p.includes('mozambique') || p.includes('south africa'))) {
+    const orig = originMatch || (p.includes('australia') ? 'Hay Point (Australia)' : (p.includes('russia') ? 'Taman (Russia)' : (p.includes('usa') ? 'Baltimore (USA)' : (p.includes('indonesia') ? 'Kalimantan (Indonesia)' : 'Hay Point (Australia)'))));
+    const dist = (ROUTE_DISTANCES[orig] && ROUTE_DISTANCES[orig][destMatch]) ? ROUTE_DISTANCES[orig][destMatch] : 4900;
+    const pInfo = PORT_CONSTRAINTS[destMatch];
+    const transitDays = (dist / (13.5 * 24)).toFixed(1);
+    
+    let vesselFit = '';
+    if (pInfo.maxDraft >= 17.5) {
+      vesselFit = `• <b>Capesize (170k DWT, 17.5m draft)</b>: <span style="color:#10B981;font-weight:600">Fully Permitted</span> (15% economy discount).<br>• <b>Panamax (75k DWT, 13.5m draft)</b>: <span style="color:#10B981;font-weight:600">Permitted</span> (10% discount).`;
+    } else if (pInfo.maxDraft >= 13.5) {
+      vesselFit = `• <b>Capesize (17.5m draft)</b>: <span style="color:#EF4444;font-weight:600">Blocked</span> (Exceeds ${destMatch}'s ${pInfo.maxDraft}m draft limit).<br>• <b>Panamax (75k DWT, 13.5m draft)</b>: <span style="color:#10B981;font-weight:600">Optimal Class</span> (10% discount, ensures UKC clearance).<br>• <b>Supramax (55k DWT, 11.5m draft)</b>: <span style="color:#10B981;font-weight:600">Permitted</span>.`;
+    } else if (pInfo.maxDraft >= 11.5) {
+      vesselFit = `• <b>Capesize & Panamax</b>: <span style="color:#EF4444;font-weight:600">Blocked</span> due to ${pInfo.maxDraft}m draft limit.<br>• <b>Supramax (55k DWT, 11.5m draft)</b>: <span style="color:#10B981;font-weight:600">Permitted</span>.`;
+    } else {
+      vesselFit = `• <b>Capesize & Panamax</b>: <span style="color:#EF4444;font-weight:600">Strictly Blocked</span> (Riverine draft ${pInfo.maxDraft}m).<br>• <b>Handysize (35k DWT, 8.5m draft)</b>: <span style="color:#10B981;font-weight:600">Only Permitted Vessel</span> (Or offshore Sandheads lightering / diversion).`;
+    }
+
+    return `<b>🚢 Route Analysis: ${orig} ➔ ${destMatch}</b><br><br>` +
+           `• <b>Voyage Distance:</b> ${dist.toLocaleString()} Nautical Miles (~${transitDays} days steaming at 13.5 kts)<br>` +
+           `• <b>Destination Port Draft:</b> Max ${pInfo.maxDraft}m | Max LOA: ${pInfo.maxLoa}m (${pInfo.type})<br>` +
+           `• <b>Pre-berthing Queue Wait:</b> ~${pInfo.avgWait} days (Discharge rate: ${pInfo.ratePerDay.toLocaleString()} MT/day)<br>` +
+           `• <b>Vessel Feasibility:</b><br>${vesselFit}<br><br>` +
+           `• <b>Operational Guidance:</b> ${destMatch === 'Haldia' ? 'Severe riverine tidal constraints on the Hooghly. Recommend routing Capesize to Gangavaram and transferring via railway rakes to Durgapur/Bokaro.' : (destMatch === 'Paradip' ? 'High thermal/coking coal congestion (~4.8d wait). Consider 2x Panamax allocation or diversion to Gangavaram to eliminate demurrage.' : 'Deep-water terminal with fast turnaround, ideal for Capesize volume chartering.')}`;
+  }
+
+  // If specific Destination Port asked about
+  if (destMatch) {
+    const pInfo = PORT_CONSTRAINTS[destMatch];
+    return `<b>⚓ Port Intelligence: ${destMatch} (${pInfo.state})</b><br><br>` +
+           `• <b>Port Type:</b> ${pInfo.type}<br>` +
+           `• <b>Max Permissible Draft:</b> ${pInfo.maxDraft} meters<br>` +
+           `• <b>Max Length Overall (LOA):</b> ${pInfo.maxLoa} meters<br>` +
+           `• <b>Average Pre-Berthing Wait:</b> ${pInfo.avgWait} days<br>` +
+           `• <b>Discharge Capacity:</b> ${pInfo.ratePerDay.toLocaleString()} MT/day<br>` +
+           `• <b>Vessel Compatibility:</b> ${pInfo.maxDraft >= 17.5 ? 'Accommodates fully laden Capesize, Panamax, Supramax, and Handysize.' : (pInfo.maxDraft >= 13.5 ? 'Accommodates Panamax (13.5m) and Supramax (11.5m). Capesize (17.5m) is draft-restricted.' : 'Strictly restricted to Handysize (8.5m) or lightered Supramax due to shallow estuarine depths.')}<br>` +
+           `• <b>Demurrage Risk:</b> ${pInfo.avgWait > 3.0 ? `High congestion (${pInfo.avgWait}d wait). Generates ~$22k/day laytime penalty.` : `Low congestion (${pInfo.avgWait}d wait). Minimal demurrage exposure.`}`;
+  }
+
+  // If specific Origin Port / Country asked about
+  if (originMatch || p.includes('australia') || p.includes('russia') || p.includes('usa') || p.includes('baltimore') || p.includes('indonesia') || p.includes('mozambique') || p.includes('south africa')) {
+    if (p.includes('russia') || p.includes('taman') || p.includes('vostochny')) {
+      return `<b>🇷🇺 Russian Coking Coal Sourcing Strategy:</b><br><br>` +
+             `• <b>Vostochny (Russian Far East):</b> ~4,500 NM to East Coast India (~14 days transit), ~500 NM shorter than Hay Point, Australia. No canal transit fees.<br>` +
+             `• <b>Taman (Black Sea):</b> ~5,700 NM via Suez Canal / Red Sea.<br>` +
+             `• <b>Pricing & Margin Advantage:</b> Russian metallurgical coal is currently priced at a <b>12%–18% FOB discount</b> compared to Australian Premium Hard Coking Coal (HCC), yielding delivered cost savings of <b>~$3.20 to $4.50/MT</b> for SAIL blast furnaces.<br>` +
+             `• <b>Strategic Impact:</b> Provides an indispensable pricing hedge against Australian supply shocks and cyclone-induced force majeures.`;
+    } else if (p.includes('australia') || p.includes('hay point') || p.includes('newcastle')) {
+      return `<b>🇦🇺 Australian Coking Coal Corridors (Hay Point & Newcastle):</b><br><br>` +
+             `• <b>Primary Hubs:</b> Hay Point (Queensland, 17.5m draft Capesize terminal) & Newcastle (NSW, 16.2m draft).<br>` +
+             `• <b>Transit Distance:</b> ~4,900 to 5,500 NM (~14–17 steaming days at 13.5 knots).<br>` +
+             `• <b>Trade Dynamics:</b> Australia supplies >65% of India's metallurgical coking coal demand for SAIL & RINL.<br>` +
+             `• <b>Operational Note:</b> Hay Point easily accommodates Capesize bulk carriers (170,000 MT), enabling maximal economy-of-scale savings on the ocean leg.`;
+    } else if (p.includes('usa') || p.includes('baltimore') || p.includes('hampton')) {
+      return `<b>🇺🇸 US East Coast Coal Corridors (Baltimore & Hampton Roads):</b><br><br>` +
+             `• <b>Transit Distance:</b> ~8,900 to 9,200 NM (~26–28 steaming days via Cape of Good Hope).<br>` +
+             `• <b>Quality:</b> High-CSR low-volatile metallurgical coking coal essential for coke oven strength.<br>` +
+             `• <b>Freight Economics:</b> Higher ton-mile cost due to long voyage duration; best suited for Panamax / Capesize parcel consolidation under long-term COA contracts.`;
+    } else if (p.includes('indonesia') || p.includes('kalimantan') || p.includes('taboneo')) {
+      return `<b>🇮🇩 Indonesian Coal Corridors (Kalimantan & Taboneo):</b><br><br>` +
+             `• <b>Transit Distance:</b> ~2,050 to 2,250 NM (~6–7 steaming days).<br>` +
+             `• <b>Vessel Class:</b> Primarily geared Supramax and Panamax loading via open-sea anchorages and floating cranes.<br>` +
+             `• <b>Usage:</b> Semi-soft coking coal and thermal coal blends with rapid turnaround cycles.`;
+    }
+  }
+
+  // Vessel comparison / allocation queries
+  if (p.includes('panamax') || p.includes('capesize') || p.includes('supramax') || p.includes('handysize') || p.includes('vessel') || p.includes('ship') || p.includes('fleet') || p.includes('allocation')) {
+    return `<b>🚢 Maritime Fleet Classes & Economy of Scale Specifications:</b><br><br>` +
+           `1. <b>Capesize (170,000 MT DWT | Draft 17.5m | LOA 290m):</b><br>` +
+           `   • <b>15% Economy Discount</b> on baseline freight. Daily charter ~$36,000/day.<br>` +
+           `   • Restricted to deepwater berths (Gangavaram 18.2m, Dhamra 18.0m). Blocked at Paradip inner berths (16.5m) and Haldia (8.5m).<br><br>` +
+           `2. <b>Panamax (75,000 MT DWT | Draft 13.5m | LOA 225m):</b><br>` +
+           `   • <b>10% Volume Discount</b>. Daily charter ~$23,000/day.<br>` +
+           `   • The optimal workhorse for Paradip (16.5m) and Vizag (14.5m), ensuring safe Under-Keel Clearance (UKC).<br><br>` +
+           `3. <b>Supramax (55,000 MT DWT | Draft 11.5m | LOA 200m):</b><br>` +
+           `   • <b>5% Volume Discount</b>. Daily charter ~$18,500/day. Highly versatile geared vessel with onboard cranes.<br><br>` +
+           `4. <b>Handysize (35,000 MT DWT | Draft 8.5m | LOA 180m):</b><br>` +
+           `   • Baseline rate (0% discount). Daily charter ~$15,000/day. The only class capable of direct berthing in shallow river ports like Haldia.`;
+  }
+
+  // Demurrage & Laytime queries
+  if (p.includes('demurrage') || p.includes('laytime') || p.includes('idle') || p.includes('congestion') || p.includes('wait') || p.includes('penalty')) {
+    return `<b>⏱️ Demurrage Liability & Congestion Mitigation Engine:</b><br><br>` +
+           `• <b>Demurrage Mechanics:</b> Demurrage is a financial penalty assessed when a vessel's total port stay (pre-berthing wait + discharge duration) exceeds the contractual laytime agreed in the charterparty.<br>` +
+           `• <b>Daily Rates:</b> Capesize: ~$36,000/day | Panamax: ~$23,000/day | Supramax: ~$18,500/day.<br>` +
+           `• <b>Bottleneck Ports:</b> Paradip (4.8 days avg wait) and Haldia (4.5 days avg wait) incur ~$80,000–$110,000 in excess demurrage per 75k MT shipment.<br>` +
+           `• <b>Gangavaram Diversion Arbitrage:</b> Gangavaram operates with automated rotary wagon tipplers and an average queue of only <b>1.1 days</b>. Diverting from Paradip to Gangavaram generates <b>~$78,000 net savings</b> per voyage.`;
+  }
+
+  // PuLP MILP Optimization queries
+  if (p.includes('milp') || p.includes('pulp') || p.includes('optimizer') || p.includes('algorithm') || p.includes('math') || p.includes('linear programming') || p.includes('prescriptive')) {
+    return `<b>⚙️ Prescriptive PuLP Mixed-Integer Linear Programming (MILP) Engine:</b><br><br>` +
+           `• <b>Objective Function:</b> Minimize Total Landed Fleet Charter Cost: <code>min ∑ (n_v * Capacity_v * Rate_v)</code><br>` +
+           `• <b>Decision Variables:</b> <code>n_v ∈ ℤ≥0</code> for Capesize, Panamax, Supramax, and Handysize.<br>` +
+           `• <b>Hard Constraints:</b><br>` +
+           `   1. <b>Demand Satisfaction:</b> <code>∑ (n_v * Capacity_v) ≥ Cargo_Volume</code><br>` +
+           `   2. <b>Draft Clearance Guardrail:</b> <code>n_v = 0</code> if <code>Vessel_Draft > Port_Max_Draft</code> or <code>LOA > Port_Max_LOA</code><br>` +
+           `   3. <b>Deadweight Slack Minimization:</b> Penalizes unutilized deadweight to avoid empty hold shipping.<br>` +
+           `• <b>Solver:</b> CBC (Coin-or Branch and Cut) resolving globally optimal fleet solutions in <50 milliseconds.`;
+  }
+
+  // ML XGBoost Model queries
+  if (p.includes('xgboost') || p.includes('model') || p.includes('forecast') || p.includes('prediction') || p.includes('ml') || p.includes('accuracy') || p.includes('r2') || p.includes('rmse')) {
+    return `<b>🤖 Machine Learning Freight Rate Forecaster (XGBoost v2.0):</b><br><br>` +
+           `• <b>Algorithm:</b> Extreme Gradient Boosting (XGBoost Regressor) trained on 2021–2025 international dry bulk fixtures.<br>` +
+           `• <b>Model Performance:</b> <b>R² = 92.01%</b> | <b>RMSE = $1.42 / MT</b> | <b>MAE = $1.08 / MT</b>.<br>` +
+           `• <b>Key Feature Drivers:</b><br>` +
+           `   1. Baltic Dry Index (BDI) and Baltic Capesize Index (BCI)<br>` +
+           `   2. VLSFO 0.5% Marine Bunker Fuel Price ($/MT)<br>` +
+           `   3. Route Nautical Miles & Great Circle Steaming Distances<br>` +
+           `   4. Vessel Deadweight Class & Volume Disparity<br>` +
+           `   5. Seasonal Southwest Monsoon weather disruption factors.`;
+  }
+
+  // Spot vs COA contract queries
+  if (p.includes('spot') || p.includes('coa') || p.includes('contract') || p.includes('timing')) {
+    return `<b>📜 Spot vs. Contract of Affreightment (COA) Strategy:</b><br><br>` +
+           `• <b>Spot Charter:</b> Single-voyage fixture priced on prevailing market rates. Highly volatile (±40% swings with BDI).<br>` +
+           `• <b>COA (Contract of Affreightment):</b> Long-term volume commitment (1–3 years) securing guaranteed ship availability at a <b>~6% volume discount</b>.<br>` +
+           `• <b>Decision Matrix:</b> When BDI is in an upward momentum (>1,800 pts), the DSS signals locking COA contracts. When BDI is softening (<1,200 pts), spot chartering is recommended for spot margin capture.`;
+  }
+
+  // General Domain Assistant Fallback
+  return `<b>🤖 MARIVANCE Maritime Logistics AI Advisor:</b><br><br>` +
+         `I analyze real-time shipping routes, port draft restrictions, ML freight forecasts, and MILP fleet allocations for India's steel industry (SAIL/RINL).<br><br>` +
+         `<b>Suggested Topics to Explore:</b><br>` +
+         `• <em>"What are the conditions of Haldia to Australia?"</em><br>` +
+         `• <em>"What are Paradip to Australia constraints?"</em><br>` +
+         `• <em>"Why allocate 2x Panamax instead of a Capesize?"</em><br>` +
+         `• <em>"What are the cost benefits of Russian coal sourcing?"</em><br>` +
+         `• <em>"How does Gangavaram diversion reduce demurrage?"</em><br>` +
+         `• <em>"Explain the PuLP MILP solver mechanics."</em>`;
+}
 
 app.post('/api/copilot', (req, res) => {
-  const { queryKey, customPrompt } = req.body;
-  if (queryKey && COPILOT_KNOWLEDGE[queryKey]) {
-    return res.json(COPILOT_KNOWLEDGE[queryKey]);
-  }
-  
-  // Fuzzy lookup or fallback
-  for (const key of Object.keys(COPILOT_KNOWLEDGE)) {
-    if (customPrompt && customPrompt.toLowerCase().includes(key.replace(/_/g, ' '))) {
-      return res.json(COPILOT_KNOWLEDGE[key]);
-    }
-  }
-  
+  const { customPrompt, origin, destination, cargoVolume } = req.body;
+  const answer = generateCopilotAnswer(customPrompt, origin, destination, cargoVolume);
   res.json({
     question: customPrompt || 'General Query',
-    answer: "MARIVANCE Maritime Decision Intelligence is analyzing active shipping routes, draft limitations, and market indices. Under current SAIL logistics parameters, Gangavaram provides deepwater Capesize discharge, Paradip serves major Panamax volumes, and Haldia requires Handysize lightering."
+    answer: answer
   });
 });
 
