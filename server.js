@@ -252,6 +252,11 @@ app.get('*', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🌊 MARIVANCE : AI-Powered Maritime Decision Intelligence running on port ${PORT}`);
-});
+// For local server execution
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🌊 MARIVANCE : AI-Powered Maritime Decision Intelligence running on port ${PORT}`);
+  });
+}
+
+export default app;
