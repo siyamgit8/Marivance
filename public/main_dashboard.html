@@ -2,16 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <script>
-        // Route Guard: Require login from Home page before accessing Dashboard
-        try {
-            if (localStorage.getItem('marivance_auth') !== 'true') {
-                window.location.replace('/');
-            }
-        } catch (e) {
-            window.location.replace('/');
-        }
-    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MARIVANCE : AI-Powered Maritime Decision Intelligence</title>
     <link rel="stylesheet" href="dashboard_styles.css">
