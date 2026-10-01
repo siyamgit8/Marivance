@@ -17,144 +17,37 @@
     <script src="maritime_routes.js"></script>
     <script src="dashboard_logic.js" defer></script>
     <style>
-        .hero-section {
-            background-color: #0c1421;
-            background-image: 
-                linear-gradient(90deg, #0c1421 0%, #0c1421 35%, rgba(12, 20, 33, 0.85) 58%, rgba(12, 20, 33, 0.2) 100%),
-                linear-gradient(180deg, transparent 65%, #0c1421 100%),
-                url('fleet-command-bg.jpeg');
-            background-size: cover;
-            background-position: right center;
-            background-repeat: no-repeat;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            padding: 32px 36px 26px 36px;
-            margin-bottom: 24px;
-            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-            position: relative;
-        }
-        .hero-title {
-            font-size: 2.1rem;
-            font-weight: 800;
-            color: #FFFFFF;
-            letter-spacing: -0.02em;
-            margin: 0 0 10px 0;
-            line-height: 1.2;
-        }
-        .hero-subtitle {
-            font-size: 0.94rem;
-            color: #94A3B8;
-            max-width: 480px;
-            line-height: 1.55;
-            margin: 0 0 24px 0;
-        }
         .sim-controls {
-            display: grid;
-            grid-template-columns: 1.15fr 1.15fr 1.4fr;
-            gap: 20px;
-            background: rgba(8, 14, 24, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            padding: 16px 20px;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            margin-bottom: 16px;
-            align-items: center;
-        }
-        @media (max-width: 1024px) {
-            .sim-controls {
-                grid-template-columns: 1fr;
-            }
+            display: flex;
+            gap: 15px;
+            background: rgba(27, 37, 49, 0.9);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-top: 20px;
+            flex-wrap: wrap;
         }
         .sim-input-group {
             display: flex;
             flex-direction: column;
             gap: 8px;
+            flex: 1;
+            min-width: 200px;
         }
         .sim-label {
-            font-size: 0.82rem;
-            color: #94A3B8;
+            font-size: 0.8rem;
+            color: var(--text-muted);
             font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
         }
-        .sim-select {
-            background: #070d18;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            color: #F8FAFC;
-            padding: 10px 14px;
-            border-radius: 6px;
-            outline: none;
-            font-family: 'Inter', sans-serif;
-            font-size: 0.88rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            width: 100%;
-        }
-        .sim-select:focus {
-            border-color: #00E5FF;
-            box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
-        }
-        .sim-slider {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 100%;
-            height: 7px;
-            background: rgba(255, 255, 255, 0.15);
+        .sim-select, .sim-slider {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px;
             border-radius: 4px;
             outline: none;
-            cursor: pointer;
-        }
-        .sim-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #00E5FF;
-            box-shadow: 0 0 12px rgba(0, 229, 255, 0.8);
-            cursor: pointer;
-            transition: transform 0.15s ease;
-        }
-        .sim-slider::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-        }
-        .sim-slider::-moz-range-thumb {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #00E5FF;
-            box-shadow: 0 0 12px rgba(0, 229, 255, 0.8);
-            cursor: pointer;
-            border: none;
-        }
-        .preset-scenarios-bar {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .preset-chip {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #CBD5E1;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.78rem;
-            font-weight: 500;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s ease;
-        }
-        .preset-chip:hover {
-            background: rgba(0, 229, 255, 0.12);
-            border-color: rgba(0, 229, 255, 0.4);
-            color: #FFFFFF;
-            transform: translateY(-1px);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
         }
         
         .settings-modal {
@@ -797,7 +690,7 @@
                 <!-- VIEW: SIMULATOR -->
                 <div id="view-simulator" class="view-section active">
                     <!-- Hero Section with Simulator -->
-                    <section class="hero-section">
+                    <section class="hero-section" style="background-image: linear-gradient(to right, #1b2531 35%, transparent), url('ship-bg.jpg');">
                         <h1 class="hero-title">Autonomous Fleet Command</h1>
                         <p class="hero-subtitle">Real-time coking coal chartering simulation. Evaluates XGBoost ML forecasts, checks water depth clearance, and solves mathematical vessel allocations.</p>
                         
@@ -817,17 +710,14 @@
                                 <label class="sim-label" for="sim-dest">🛬 Indian Discharge Port</label>
                                 <select id="sim-dest" class="sim-select">
                                     <option value="Paradip" selected>Paradip (Odisha) - 16.5m</option>
-                                    <option value="Visakhapatnam (Vizag)">Visakhapatnam (Vizag) - 14.5m</option>
+                                    <option value="Visakhapatnam (Vizag)">Vizag (AP) - 14.5m</option>
                                     <option value="Gangavaram">Gangavaram - 18.2m</option>
                                     <option value="Haldia">Haldia (WB) - 8.5m</option>
                                 </select>
                             </div>
                             <div class="sim-input-group">
-                                <label class="sim-label" for="sim-volume">
-                                    <span>📦 Cargo Volume:</span>
-                                    <span id="vol-display" style="color:var(--accent-cyan); font-weight: 700; font-size: 0.92rem;">75,000 MT</span>
-                                </label>
-                                <input type="range" id="sim-volume" class="sim-slider" min="20000" max="200000" step="5000" value="75000">
+                                <label class="sim-label" for="sim-volume">📦 Cargo Volume (MT): <span id="vol-display" style="color:var(--accent-cyan); font-weight: 600;">75,000 MT</span></label>
+                                <input type="number" id="sim-volume" class="sim-select" min="1" step="1000" value="75000" placeholder="Enter cargo volume in MT" style="font-size: 0.95rem; font-weight: 600; color: var(--accent-cyan);">
                             </div>
                         </div>
 
@@ -835,16 +725,16 @@
                         <div class="preset-scenarios-bar">
                             <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 600;">⚡ One-Click Demo Presets:</span>
                             <button class="preset-chip" onclick="applyPresetScenario('Hay Point (Australia)', 'Paradip', 150000)">
-                                <span style="font-size: 0.95rem;">🇦🇺</span> Australia ➔ Paradip (150k MT Capesize)
+                                <span>🇦🇺</span> Australia ➔ Paradip (150k MT Capesize)
                             </button>
                             <button class="preset-chip" onclick="applyPresetScenario('Taman (Russia)', 'Gangavaram', 170000)">
-                                <span style="font-size: 0.95rem;">🇷🇺</span> Russia ➔ Gangavaram (170k MT Ultra-Deep)
+                                <span>🇷🇺</span> Russia ➔ Gangavaram (170k MT Ultra-Deep)
                             </button>
                             <button class="preset-chip" onclick="applyPresetScenario('Baltimore (USA)', 'Haldia', 75000)">
-                                <span style="font-size: 0.95rem;">🇺🇸</span> USA ➔ Haldia River (75k MT Riverine Draft Test)
+                                <span>🇺🇸</span> USA ➔ Haldia River (75k MT Riverine Draft Test)
                             </button>
                             <button class="preset-chip" onclick="applyPresetScenario('Kalimantan (Indonesia)', 'Visakhapatnam (Vizag)', 55000)">
-                                <span style="font-size: 0.95rem;">🇮🇩</span> Indonesia ➔ Vizag (55k MT Supramax)
+                                <span>🇮🇩</span> Indonesia ➔ Vizag (55k MT Supramax)
                             </button>
                         </div>
                     </section>
