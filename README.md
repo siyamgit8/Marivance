@@ -146,6 +146,11 @@ npm run dev
 python optimization_engine.py
 ```
 
+### 5. Launch Streamlit Executive Command Center (Optional)
+```bash
+streamlit run dashboard.py
+```
+
 ---
 
 ## 🏛️ Ministry of Steel & SAIL Strategic Value Add

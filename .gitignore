@@ -10,9 +10,14 @@ venv/
 .vscode/
 node_modules/
 dist/
-*.db
-*.pkl
 *.pdf
 MARIVANCE_Demo_Video_Script.*
 generate_script_pdf.py
+
+# Ignore generic db and pkl except production artifacts
+*.db
+*.pkl
+!freight_xgboost_model.pkl
+!model_features.pkl
+!logistics_platform.db
 
