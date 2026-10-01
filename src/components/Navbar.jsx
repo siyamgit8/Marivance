@@ -1,7 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Ship, ArrowRight } from 'lucide-react';
 
 export default function Navbar() {
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const scrollToSection = (e, targetId) => {
+    e.preventDefault();
+    setActiveTab(targetId);
+    const element = document.getElementById(targetId);
+    if (element) {
+      const yOffset = -90; 
+      const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+  };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const sections = ['overview', 'help', 'faqs'];
+      const scrollPosition = window.scrollY + 200;
+
+      for (const sectionId of sections) {
+        const el = document.getElementById(sectionId);
+        if (el) {
+          const top = el.offsetTop;
+          const height = el.offsetHeight;
+          if (scrollPosition >= top && scrollPosition < top + height) {
+            setActiveTab(sectionId);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
     <header className="navbar" style={{
       position: 'fixed',
@@ -21,7 +56,7 @@ export default function Navbar() {
         padding: '0 4vw'
       }}>
         {/* Left Corner: Brand Symbol */}
-        <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
+        <a href="#" onClick={(e) => scrollToSection(e, 'overview')} style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
           <div style={{
             width: '40px',
             height: '40px',
@@ -49,19 +84,66 @@ export default function Navbar() {
         {/* Center: Glass Pill Menu */}
         <nav style={{ 
           display: 'flex', 
-          gap: '32px', 
+          gap: '6px', 
           alignItems: 'center',
-          background: 'rgba(2, 6, 15, 0.45)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          background: 'rgba(2, 6, 15, 0.55)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           border: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-          padding: '10px 32px',
+          boxShadow: '0 4px 30px rgba(0, 0, 0, 0.2)',
+          padding: '5px 8px',
           borderRadius: '9999px'
         }}>
-          <a href="#overview" style={{ color: '#E2E8F0', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 500, transition: 'color 0.2s' }}>Overview</a>
-          <a href="#help" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 500, transition: 'color 0.2s' }}>Help</a>
-          <a href="#faqs" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 500, transition: 'color 0.2s' }}>FAQs</a>
+          <button 
+            onClick={(e) => scrollToSection(e, 'overview')} 
+            style={{ 
+              background: activeTab === 'overview' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
+              color: activeTab === 'overview' ? '#FFFFFF' : '#94A3B8',
+              border: activeTab === 'overview' ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid transparent',
+              fontSize: '0.85rem', 
+              fontWeight: activeTab === 'overview' ? 600 : 500, 
+              padding: '6px 18px',
+              borderRadius: '9999px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            Overview
+          </button>
+          
+          <button 
+            onClick={(e) => scrollToSection(e, 'help')} 
+            style={{ 
+              background: activeTab === 'help' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
+              color: activeTab === 'help' ? '#FFFFFF' : '#94A3B8',
+              border: activeTab === 'help' ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid transparent',
+              fontSize: '0.85rem', 
+              fontWeight: activeTab === 'help' ? 600 : 500, 
+              padding: '6px 18px',
+              borderRadius: '9999px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            Help
+          </button>
+
+          <button 
+            onClick={(e) => scrollToSection(e, 'faqs')} 
+            style={{ 
+              background: activeTab === 'faqs' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
+              color: activeTab === 'faqs' ? '#FFFFFF' : '#94A3B8',
+              border: activeTab === 'faqs' ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid transparent',
+              fontSize: '0.85rem', 
+              fontWeight: activeTab === 'faqs' ? 600 : 500, 
+              padding: '6px 18px',
+              borderRadius: '9999px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            FAQs
+          </button>
         </nav>
 
         {/* Right Corner: Direct Launch Button */}
